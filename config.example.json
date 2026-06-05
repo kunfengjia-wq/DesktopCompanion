@@ -1,0 +1,61 @@
+{
+  "_说明": "桌面伴侣配置文件示例 - 复制为 config.json 并填入你的 API Key",
+
+  "角色设定": {
+    "名称": "小枫",
+    "性格": "温柔活泼、有点调皮",
+    "语气": "口语化，像朋友一样聊天"
+  },
+
+  "模型配置": {
+    "说明": "DeepSeek API 当前仅支持文本模型，不支持视觉/多模态",
+    "提供商": "deepseek",
+    "API密钥": "在此填入你的 DeepSeek API Key",
+    "API地址": "https://api.deepseek.com",
+    "模型名称": "deepseek-v4-flash",
+    "视觉提供商": "gemini",
+    "视觉API密钥": "",
+    "视觉API地址": "https://generativelanguage.googleapis.com/v1beta",
+    "视觉模型名称": "gemini-2.0-flash-exp",
+    "温度": 0.8,
+    "最大Token数": 2048
+  },
+
+  "屏幕捕获": {
+    "启用": true,
+    "捕获间隔": 3,
+    "捕获模式": "活动窗口",
+    "最大宽度": 1280,
+    "检测变化": true
+  },
+
+  "摄像头": {
+    "启用": false,
+    "设备ID": 0
+  },
+
+  "语音": {
+    "ASR引擎": "本地",
+    "TTS引擎": "edge-tts",
+    "语音唤醒": false,
+    "语音打断": true
+  },
+
+  "VRM模型": {
+    "模型文件": "presenter/webview/models/default.vrm",
+    "窗口宽度": 400,
+    "窗口高度": 600,
+    "透明模式": true,
+    "始终置顶": true
+  },
+
+  "记忆": {
+    "最大对话轮数": 50,
+    "保存路径": "data/memory.json"
+  },
+
+  "行为": {
+    "主动搭话间隔": 120,
+    "闲置时眨眼的概率": 0.3
+  }
+}
