@@ -32,14 +32,6 @@ class DesktopCompanionApp:
 
     def _load_config(self):
         """加载配置文件"""
-        config_path = Path("config.json")
-        if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {}
-
-    def _load_config(self):
-        """加载配置文件"""
         config_path = Path(__file__).parent / "config.json"
         if config_path.exists():
             with open(config_path, "r", encoding="utf-8") as f:
@@ -97,9 +89,22 @@ class DesktopCompanionApp:
         voice_cfg = self.config.get("语音", {})
         character_name = self.config.get("角色设定", {}).get("名称", "助手")
 
-        self.asr = ASREngine(voice_cfg)
         self.tts = TTSEngine(voice_cfg, character_name)
-        print("[语音] ASR + TTS 模块就绪")
+
+        # ASR 语音识别（后台监听，有语音时自动处理）
+        self.asr = ASREngine(voice_cfg)
+        if voice_cfg.get("ASR引擎", "本地") != "关闭":
+            try:
+                self.asr.start_listening(callback=self._on_voice_input)
+                print("[语音] 语音识别已启动（对着麦克风说话即可）")
+            except Exception as e:
+                print(f"[语音] 语音识别启动失败（可打字交互）: {e}")
+
+        print("[语音] TTS 模块就绪")
+
+    def _on_voice_input(self, text: str):
+        """收到语音输入回调"""
+        self.message_queue.put({"type": "voice_input", "text": text})
 
     def _init_vrm_window(self):
         """初始化VRM悬浮窗"""
@@ -121,10 +126,16 @@ class DesktopCompanionApp:
         """运行主循环"""
         self.initialize()
         print("\n✨ 桌面伴侣已启动！")
+        print("💡 直接对着麦克风说话，或在终端输入文字按回车")
+        print("💡 输入 /quit 退出")
 
         # 启动后台处理线程
         bg_thread = threading.Thread(target=self._background_loop, daemon=True)
         bg_thread.start()
+
+        # 启动终端文字输入线程（作为语音的补充）
+        input_thread = threading.Thread(target=self._console_input_loop, daemon=True)
+        input_thread.start()
 
         # 启动 PyQt 事件循环（主线程）
         if self.vrm_window:
@@ -133,6 +144,21 @@ class DesktopCompanionApp:
             return QApplication.instance().exec()
 
         return 0
+
+    def _console_input_loop(self):
+        """终端文字输入循环（语音识别的后备方案）"""
+        while self.running:
+            try:
+                user_input = input()
+                if user_input.strip():
+                    if user_input.strip() == "/quit":
+                        self.shutdown()
+                        break
+                    self.message_queue.put({"type": "text_input", "text": user_input.strip()})
+            except (EOFError, KeyboardInterrupt):
+                break
+            except Exception:
+                time.sleep(0.5)
 
     def _background_loop(self):
         """后台处理循环"""
@@ -179,24 +205,39 @@ class DesktopCompanionApp:
             # 构建对话上下文
             history = self.memory.get_history()
 
-            # 文字回复
+            # 先用 VLM 分析画面（如果有截图且视觉模块可用）
+            screen_desc = None
+            if image_context is not None and self.vlm and self.vlm.is_available():
+                screen_desc = self.vlm.describe_image(image_context, "请简要描述这个屏幕上发生了什么")
+                print(f"[视觉] 画面分析: {screen_desc[:100]}...")
+
+            # 文字回复（带画面描述作为上下文）
+            extra_context = f"【当前屏幕画面】{screen_desc}" if screen_desc else None
             response = self.llm.chat(text, history, image_context)
+
+            # 如果画面有变化且VLM可用，让角色主动提及
+            if screen_desc:
+                response = response  # LLM已看到图片，不需额外处理
+
             print(f"[{self.config.get('角色设定', {}).get('名称', '助手')}] {response}")
+
+            # 隐藏思考状态
+            if self.vrm_window:
+                self.vrm_window.hide_thinking()
 
             # 保存记忆
             self.memory.add(text, response)
 
-            # 更新VRM角色
+            # 更新VRM角色 + 语音播放
             if self.vrm_window:
                 self.vrm_window.speak(response)
-
-            # 语音播放
             self.tts.speak(response)
 
         except Exception as e:
             print(f"[错误] 生成回复失败: {e}")
             if self.vrm_window:
-                self.vrm_window.show_error("我有点卡住了，能再说一遍吗？")
+                self.vrm_window.hide_thinking()
+                self.vrm_window.speak("唔，我刚才走神了，你再说一遍？")
 
     def shutdown(self):
         """关闭所有模块"""

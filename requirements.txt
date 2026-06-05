@@ -8,6 +8,9 @@ PyQt6-WebEngine>=6.5.0
 # 屏幕捕获
 mss>=9.0.0
 opencv-python-headless>=4.8.0
+dxcam>=0.4.0
+pygetwindow>=0.0.9
+pyautogui>=0.9.54
 
 # AI API
 openai>=1.0.0

@@ -133,9 +133,9 @@ class VRMWindow(QMainWindow):
         js_code = 'vrmController.showThinking()'
         self.web_view.page().runJavaScript(js_code)
 
-    def show_error(self, text: str):
-        """显示错误"""
-        js_code = f'vrmController.speak(`{self._escape_js(text)}`, "sad")'
+    def hide_thinking(self):
+        """隐藏思考中"""
+        js_code = 'vrmController.hideThinking()'
         self.web_view.page().runJavaScript(js_code)
 
     def set_expression(self, expression: str):
