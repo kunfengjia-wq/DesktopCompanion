@@ -14,7 +14,7 @@ class LLMEngine:
         self.config = config
         self.api_key = config.get("API密钥", "")
         self.api_base = config.get("API地址", "https://api.deepseek.com")
-        self.model = config.get("模型名称", "deepseek-chat")
+        self.model = config.get("模型名称", "deepseek-v4-flash")
         self.temperature = config.get("温度", 0.8)
         self.max_tokens = config.get("最大Token数", 2048)
 

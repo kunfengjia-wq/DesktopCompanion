@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>VRM 测试页面</title>
+<style>
+  body {
+    margin: 0; overflow: hidden;
+    font-family: "Microsoft YaHei", sans-serif;
+    background: #f0f0f0;
+  }
+  #test-panel {
+    position: fixed; bottom: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    padding: 12px 16px;
+    z-index: 100;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+    max-width: 95%;
+  }
+  button {
+    padding: 6px 14px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  button:hover { background: #e8e8e8; }
+  button.primary { background: #4A90D9; color: #fff; border-color: #3A80C9; }
+  button.primary:hover { background: #3A80C9; }
+  button.success { background: #52C41A; color: #fff; border-color: #42B40A; }
+  button.success:hover { background: #42B40A; }
+  button.warn { background: #FAAD14; color: #fff; border-color: #EA9D04; }
+  button.warn:hover { background: #EA9D04; }
+  button.danger { background: #FF4D4F; color: #fff; border-color: #EF3D3F; }
+  button.danger:hover { background: #EF3D3F; }
+  #status {
+    position: fixed; top: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 100;
+    display: none;
+  }
+  /* 让 canvas 显示在灰色背景上以便观察透明效果 */
+  #canvas-container {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+</style>
+</head>
+<body>
+  <div id="status"></div>
+  <div id="canvas-container"></div>
+  <div id="test-panel">
+    <button class="primary" onclick="testSpeak()">说话(默认)</button>
+    <button onclick="testSpeakHappy()">说话(开心)</button>
+    <button onclick="testSpeakSad()">说话(难过)</button>
+    <button onclick="testThinking()">思考开关</button>
+    <button onclick="window.vrmController.playIdle('tilt')">歪头</button>
+    <button onclick="window.vrmController.playIdle('look_around')">看四周</button>
+    <button onclick="window.vrmController.playIdle('stretch')">伸懒腰</button>
+    <button onclick="window.vrmController.playIdle('blink')">眨眼</button>
+    <button class="success" onclick="testLoadStatus()">检查状态</button>
+    <button class="danger" onclick="testReload()">重新加载</button>
+  </div>
+  <input type="text" id="speak-input"
+    style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:100;
+           padding:8px 12px;border-radius:8px;border:1px solid #ccc;width:60%;max-width:400px;
+           font-size:14px;display:none;"
+    placeholder="输入要说的话，回车发送"
+    onkeydown="if(event.key==='Enter')testCustomSpeak()">
+
+  <!-- 和 index.html 相同的 importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  // 动态导入 vrm_controller.js
+  try {
+    const { VRMController } = await import('./vrm_controller.js');
+    window.vrmController = new VRMController();
+
+    // 等待一小段时间后更新状态
+    setTimeout(() => {
+      const status = document.getElementById('status');
+      status.style.display = 'block';
+      status.textContent = 'VRMController 已创建，正在加载模型...';
+    }, 100);
+  } catch (e) {
+    console.error('加载 VRMController 失败:', e);
+    document.getElementById('status').style.display = 'block';
+    document.getElementById('status').textContent = '加载 VRMController 失败: ' + e.message;
+  }
+  </script>
+
+  <script>
+  // 测试函数
+  function showStatus(msg, isError) {
+    const el = document.getElementById('status');
+    el.style.display = 'block';
+    el.textContent = msg;
+    el.style.background = isError ? 'rgba(255,50,50,0.8)' : 'rgba(0,0,0,0.7)';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+
+  function testSpeak() {
+    if (!window.vrmController) return showStatus('控制器未就绪', true);
+    window.vrmController.speak('你好！我是你的桌面伴侣。今天天气不错！');
+    showStatus('测试说话 (默认表情)');
+  }
+
+  function testSpeakHappy() {
+    if (!window.vrmController) return showStatus('控制器未就绪', true);
+    window.vrmController.speak('太棒了！今天真是开心的一天！', 'happy');
+    showStatus('测试说话 (开心表情)');
+  }
+
+  function testSpeakSad() {
+    if (!window.vrmController) return showStatus('控制器未就绪', true);
+    window.vrmController.speak('哎，有点难过呢...', 'sad');
+    showStatus('测试说话 (难过表情)');
+  }
+
+  let thinkingVisible = false;
+  function testThinking() {
+    if (!window.vrmController) return showStatus('控制器未就绪', true);
+    if (!thinkingVisible) {
+      window.vrmController.showThinking();
+      thinkingVisible = true;
+      showStatus('显示思考动画');
+    } else {
+      window.vrmController.hideThinking();
+      thinkingVisible = false;
+      showStatus('隐藏思考动画');
+    }
+  }
+
+  function testLoadStatus() {
+    if (!window.vrmController) return showStatus('控制器未就绪', true);
+    const vrmLoaded = window.vrmController._vrmLoaded;
+    const hasPlaceholder = !!window.vrmController.character;
+    const hasVrm = !!window.vrmController.vrm;
+    const msg = vrmLoaded
+      ? '状态: VRM 模型已加载 (使用真实 VRM)'
+      : '状态: 使用占位角色 (VRM 模型未找到或加载失败)';
+    showStatus(msg + ` | vrm=${hasVrm} placeholder=${hasPlaceholder}`);
+    console.log('[VRM Test]', {
+      vrmLoaded, hasPlaceholder, hasVrm,
+      vrm: window.vrmController.vrm,
+      character: window.vrmController.character
+    });
+  }
+
+  function testReload() {
+    showStatus('刷新页面重新加载...');
+    setTimeout(() => location.reload(), 500);
+  }
+
+  function testCustomSpeak() {
+    const input = document.getElementById('speak-input');
+    if (input.value && window.vrmController) {
+      window.vrmController.speak(input.value);
+      input.value = '';
+    }
+  }
+  </script>
+</body>
+</html>
