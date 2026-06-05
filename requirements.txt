@@ -1,0 +1,27 @@
+# 桌面伴侣依赖
+# 安装: pip install -r requirements.txt
+
+# GUI 框架
+PyQt6>=6.5.0
+PyQt6-WebEngine>=6.5.0
+
+# 屏幕捕获
+mss>=9.0.0
+opencv-python-headless>=4.8.0
+
+# AI API
+openai>=1.0.0
+httpx>=0.25.0
+
+# 语音
+edge-tts>=6.1.0
+pyaudio>=0.2.11
+SpeechRecognition>=3.10.0
+
+# 工具
+Pillow>=10.0.0
+numpy>=1.24.0
+requests>=2.31.0
+
+# 配置管理
+pyjson5>=1.6.0

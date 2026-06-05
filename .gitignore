@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 环境
+venv/
+.env
+*.env
+
+# 配置文件（含API Key）
+config.json
+
+# 数据
+data/memory.json
+data/logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 大文件
+presenter/webview/models/*.vrm
+!presenter/webview/models/.gitkeep

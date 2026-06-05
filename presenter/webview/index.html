@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRM 桌面伴侣</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: transparent;
+  }
+  #canvas-container {
+    width: 100%; height: 100%;
+  }
+  canvas { display: block; }
+
+  /* 对话气泡 */
+  #bubble {
+    display: none;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 85%;
+    background: rgba(255,255,255,0.92);
+    color: #333;
+    padding: 10px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    font-family: "Microsoft YaHei", sans-serif;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    word-wrap: break-word;
+    pointer-events: none;
+  }
+  #bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid rgba(255,255,255,0.92);
+  }
+
+  /* 思考动画 */
+  #thinking {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    color: rgba(255,255,255,0.8);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  }
+
+  /* 加载提示 */
+  #loading {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #999;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div id="loading">加载角色中...</div>
+  <div id="thinking">💭</div>
+  <div id="bubble"></div>
+  <div id="canvas-container"></div>
+
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { VRMLoaderPlugin } from 'three/addons/libs/three-vrm.module.js';
+
+  class VRMController {
+    constructor() {
+      this.vrm = null;
+      this.scene = null;
+      this.camera = null;
+      this.renderer = null;
+      this.clock = new THREE.Clock();
+      this.mixer = null;
+
+      this._init();
+    }
+
+    async _init() {
+      // 场景
+      this.scene = new THREE.Scene();
+      this.scene.background = null; // 透明
+
+      // 相机
+      this.camera = new THREE.PerspectiveCamera(35, 400/600, 0.1, 20);
+      this.camera.position.set(0, 1.2, -2.5);
+      this.camera.lookAt(0, 1.0, 0);
+
+      // 渲染器
+      const container = document.getElementById('canvas-container');
+      this.renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true
+      });
+      this.renderer.setSize(container.clientWidth, container.clientHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = 1.0;
+      container.appendChild(this.renderer.domElement);
+
+      // 灯光
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      this.scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      mainLight.position.set(1, 2, 2);
+      this.scene.add(mainLight);
+
+      const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+      fillLight.position.set(-1, 1, 1);
+      this.scene.add(fillLight);
+
+      const rimLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      rimLight.position.set(0, 1, -2);
+      this.scene.add(rimLight);
+
+      // 加载 VRM 模型
+      await this._loadVRM();
+
+      // 开始渲染
+      this._animate();
+
+      // 窗口变化
+      window.addEventListener('resize', () => this._onResize());
+    }
+
+    async _loadVRM() {
+      try {
+        // 尝试加载默认模型
+        const modelPath = './models/default.vrm';
+        const response = await fetch(modelPath);
+        if (!response.ok) throw new Error('Model not found');
+
+        // 由于默认模型可能不存在，我们先创建一个简单的占位角色
+        this._createPlaceholder();
+        document.getElementById('loading').style.display = 'none';
+        console.log('[VRM] 占位角色已创建');
+      } catch (e) {
+        console.log('[VRM] 默认模型未找到，使用占位角色:', e.message);
+        this._createPlaceholder();
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    _createPlaceholder() {
+      // 创建一个简单可爱的占位角色（Q版人物）
+      const group = new THREE.Group();
+
+      // 身体
+      const bodyGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.6, 12);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xF5A0B0, roughness: 0.3 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.3;
+      group.add(body);
+
+      // 头部
+      const headGeo = new THREE.SphereGeometry(0.28, 16, 16);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xFFE0C0, roughness: 0.2 });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 0.75;
+      group.add(head);
+
+      // 眼睛（左）
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+      const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+      eyeL.position.set(-0.1, 0.8, 0.25);
+      group.add(eyeL);
+
+      // 眼睛（右）
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+      eyeR.position.set(0.1, 0.8, 0.25);
+      group.add(eyeR);
+
+      // 嘴巴（小圆）
+      const mouthMat = new THREE.MeshStandardMaterial({ color: 0xDD6688 });
+      const mouthGeo = new THREE.SphereGeometry(0.03, 8, 8);
+      const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+      mouth.position.set(0, 0.68, 0.28);
+      mouth.scale.set(1, 0.4, 0.5);
+      group.add(mouth);
+
+      // 头发（简单半球）
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x443366 });
+      const hairGeo = new THREE.SphereGeometry(0.3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      const hair = new THREE.Mesh(hairGeo, hairMat);
+      hair.position.y = 0.78;
+      group.add(hair);
+
+      // 手臂（左）
+      const armMat = new THREE.MeshStandardMaterial({ color: 0xFFE0C0 });
+      const armGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.3, 8);
+      const armL = new THREE.Mesh(armGeo, armMat);
+      armL.position.set(-0.35, 0.5, 0);
+      armL.rotation.z = 0.2;
+      group.add(armL);
+
+      // 手臂（右）
+      const armR = new THREE.Mesh(armGeo, armMat);
+      armR.position.set(0.35, 0.5, 0);
+      armR.rotation.z = -0.2;
+      group.add(armR);
+
+      group.position.y = 0;
+      this.scene.add(group);
+      this.character = group;
+      this.head = head;
+      this.arms = [armL, armR];
+
+      // 闲置动画用的变量
+      this._idleTime = 0;
+      this._blinkTimer = 0;
+      this._eyeL = eyeL;
+      this._eyeR = eyeR;
+    }
+
+    _animate() {
+      requestAnimationFrame(() => this._animate());
+
+      const delta = this.clock.getDelta();
+
+      // 闲置呼吸动画
+      if (this.character) {
+        this._idleTime += delta;
+        // 轻微呼吸
+        const breathe = Math.sin(this._idleTime * 1.5) * 0.003;
+        this.character.position.y = breathe;
+
+        // 闪烁
+        this._blinkTimer += delta;
+        if (this._blinkTimer > 3 + Math.random() * 4) {
+          this._blink();
+          this._blinkTimer = 0;
+        }
+      }
+
+      this.renderer.render(this.scene, this.camera);
+    }
+
+    _blink() {
+      if (this._eyeL && this._eyeR) {
+        this._eyeL.scale.y = 0.1;
+        this._eyeR.scale.y = 0.1;
+        setTimeout(() => {
+          if (this._eyeL && this._eyeR) {
+            this._eyeL.scale.y = 1;
+            this._eyeR.scale.y = 1;
+          }
+        }, 150);
+      }
+    }
+
+    // --- 公开接口 ---
+
+    speak(text, expression = 'neutral') {
+      const bubble = document.getElementById('bubble');
+      bubble.textContent = text;
+      bubble.style.display = 'block';
+      clearTimeout(this._bubbleTimer);
+      this._bubbleTimer = setTimeout(() => {
+        bubble.style.display = 'none';
+      }, Math.max(2000, text.length * 150));
+
+      // 简单口型同步
+      if (this.character) {
+        const mouth = this.character.children.find(c => c.geometry?.type === 'SphereGeometry' && c.position.y === 0.68);
+        if (mouth) {
+          mouth.scale.y = 0.8;
+          setTimeout(() => { if (mouth) mouth.scale.y = 0.4; }, 100);
+        }
+      }
+
+      console.log('[VRM] 说话:', text);
+    }
+
+    showThinking() {
+      document.getElementById('thinking').style.display = 'block';
+    }
+
+    hideThinking() {
+      document.getElementById('thinking').style.display = 'none';
+    }
+
+    setExpression(expression) {
+      // 表情切换（扩展用）
+      console.log('[VRM] 表情:', expression);
+    }
+
+    playIdle(action) {
+      if (!this.character) return;
+
+      switch(action) {
+        case 'blink':
+          this._blink();
+          break;
+        case 'tilt':
+          this.character.rotation.z = 0.05;
+          setTimeout(() => { if (this.character) this.character.rotation.z = 0; }, 500);
+          break;
+        case 'look_around':
+          if (this.head) {
+            this.head.rotation.y = 0.2;
+            setTimeout(() => { if (this.head) this.head.rotation.y = 0; }, 800);
+          }
+          break;
+      }
+    }
+
+    _onResize() {
+      const container = document.getElementById('canvas-container');
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(w, h);
+    }
+  }
+
+  // 全局控制器
+  window.vrmController = new VRMController();
+  </script>
+</body>
+</html>
