@@ -27,4 +27,5 @@ Thumbs.db
 
 # 大文件
 presenter/webview/models/*.vrm
+!presenter/webview/models/default.vrm
 !presenter/webview/models/.gitkeep
