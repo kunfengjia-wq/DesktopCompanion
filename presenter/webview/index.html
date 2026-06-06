@@ -86,8 +86,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "./lib/three.module.js",
+      "three/addons/": "./lib/"
     }
   }
   </script>
@@ -191,7 +191,7 @@
         // 尝试动态加载 @pixiv/three-vrm（CDN 不可用时优雅降级）
         let VRMLoaderPlugin;
         try {
-          const vrmModule = await import('https://unpkg.com/@pixiv/three-vrm@3.1.0/lib/three-vrm.module.js');
+          const vrmModule = await import('./lib/three-vrm.module.js');
           VRMLoaderPlugin = vrmModule.VRMLoaderPlugin;
         } catch (cdnErr) {
           console.warn('[VRM] @pixiv/three-vrm CDN 加载失败:', cdnErr.message);

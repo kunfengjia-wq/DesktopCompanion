@@ -116,10 +116,10 @@ export class VRMController {
       // 动态加载 @pixiv/three-vrm（CDN 不可用时降级）
       let VRMLoaderPlugin;
       try {
-        const vrmModule = await import('https://unpkg.com/@pixiv/three-vrm@3.1.0/lib/three-vrm.module.js');
+        const vrmModule = await import('./lib/three-vrm.module.js');
         VRMLoaderPlugin = vrmModule.VRMLoaderPlugin;
-      } catch (cdnErr) {
-        console.warn('[VRM] @pixiv/three-vrm CDN 不可用:', cdnErr.message);
+      } catch (localErr) {
+        console.warn('[VRM] VRM 模块加载失败:', localErr.message);
         throw new Error('VRM 依赖不可用');
       }
 
