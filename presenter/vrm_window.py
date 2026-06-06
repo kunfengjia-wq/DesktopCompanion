@@ -48,12 +48,13 @@ class VRMWindow(QMainWindow):
         self.bridge.speak_signal.connect(self._on_speak_command)
 
         self._init_ui()
+        self._page_loaded = False
+
         self._load_vrm_view()
 
-        # 闲置动画定时器
+        # 闲置动画定时器（页面加载完才启动）
         self._idle_timer = QTimer()
         self._idle_timer.timeout.connect(self._trigger_idle_animation)
-        self._idle_timer.start(8000)
 
     def _init_ui(self):
         """初始化窗口 UI"""
@@ -113,8 +114,8 @@ class VRMWindow(QMainWindow):
         url = QUrl.fromLocalFile(str(html_path.absolute()))
         self.web_view.load(url)
 
-        # 设置桥接通信
-        self.web_view.page().runJavaScript("console.log('VRM View loaded')")
+        # 等页面加载完成后再调用 JS
+        self.web_view.loadFinished.connect(self._on_page_loaded)
 
     def speak(self, text: str):
         """角色说话"""
@@ -124,32 +125,70 @@ class VRMWindow(QMainWindow):
 
         # 通知 JS 层说话
         js_code = f'vrmController.speak(`{self._escape_js(text)}`, "{expression}")'
-        self.web_view.page().runJavaScript(js_code)
+        self._safe_js(js_code)
 
         print(f"[{self.character_name}] {text}")
 
     def show_thinking(self):
         """显示思考中"""
-        js_code = 'vrmController.showThinking()'
-        self.web_view.page().runJavaScript(js_code)
+        self._safe_js('vrmController.showThinking()')
 
     def hide_thinking(self):
         """隐藏思考中"""
-        js_code = 'vrmController.hideThinking()'
-        self.web_view.page().runJavaScript(js_code)
+        self._safe_js('vrmController.hideThinking()')
 
     def set_expression(self, expression: str):
         """设置角色表情"""
-        js_code = f'vrmController.setExpression("{expression}")'
-        self.web_view.page().runJavaScript(js_code)
+        self._safe_js(f'vrmController.setExpression("{expression}")')
+
+    def _on_page_loaded(self, ok: bool):
+        """页面加载完成回调"""
+        if ok:
+            self._page_loaded = True
+            print("[VRM] 页面加载完成")
+            # 延迟一会儿等 Three.js 初始化完成
+            QTimer.singleShot(1000, self._start_vrm_after_load)
+        else:
+            print("[VRM] 页面加载失败")
+
+    def _start_vrm_after_load(self):
+        """页面加载完成后启动 VRM 功能"""
+        # 标记角色就绪
+        js_code = """
+        if (typeof vrmController !== 'undefined' && vrmController) {
+            document.getElementById('loading').style.display = 'none';
+            console.log('[VRM] 控制器已就绪');
+            true;
+        } else {
+            // 还没加载完，等会再试
+            console.log('[VRM] 等待控制器初始化...');
+            false;
+        }
+        """
+        self.web_view.page().runJavaScript(js_code, self._on_vrm_ready)
+
+    def _on_vrm_ready(self, result):
+        """VRM 控制器就绪回调"""
+        if result:
+            print("[VRM] 3D 角色就绪")
+            self._idle_timer.start(8000)
+        else:
+            # 1秒后重试
+            QTimer.singleShot(2000, self._start_vrm_after_load)
 
     def _trigger_idle_animation(self):
         """触发闲置动画"""
+        if not self._page_loaded or not self._on_page_loaded:
+            return
         import random
         actions = ["blink", "look_around", "stretch", "tilt"]
         action = random.choice(actions)
-        js_code = f'vrmController.playIdle("{action}")'
-        self.web_view.page().runJavaScript(js_code)
+        self._safe_js(f'vrmController.playIdle("{action}")')
+
+    def _safe_js(self, code: str):
+        """安全执行 JS（页面未加载时不执行）"""
+        if self._page_loaded:
+            self.web_view.page().runJavaScript(code)
 
     def _detect_emotion(self, text: str) -> str:
         """简单情绪检测"""

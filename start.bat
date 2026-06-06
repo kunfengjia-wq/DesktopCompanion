@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+set PYTHONIOENCODING=utf-8
 title 桌面伴侣
 echo ================================
 echo   桌面伴侣 - AI Desktop Companion

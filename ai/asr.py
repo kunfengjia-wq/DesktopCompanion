@@ -48,8 +48,17 @@ class ASREngine:
                 try:
                     with mic as source:
                         audio = recognizer.listen(source, timeout=1, phrase_time_limit=10)
-                    text = recognizer.recognize_google(audio, language="zh-CN")
-                    if text.strip() and self._callback:
+                    text = None
+                    try:
+                        text = recognizer.recognize_google(audio, language="zh-CN")
+                    except sr.RequestError:
+                        # Google API 可能被墙，尝试本地 sphinx 或跳过
+                        try:
+                            text = recognizer.recognize_sphinx(audio, language="zh-CN")
+                        except:
+                            pass
+
+                    if text and text.strip() and self._callback:
                         print(f"[ASR] 识别: {text}")
                         self._callback(text)
                 except sr.WaitTimeoutError:

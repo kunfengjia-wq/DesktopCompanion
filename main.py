@@ -125,9 +125,9 @@ class DesktopCompanionApp:
     def run(self):
         """运行主循环"""
         self.initialize()
-        print("\n✨ 桌面伴侣已启动！")
-        print("💡 直接对着麦克风说话，或在终端输入文字按回车")
-        print("💡 输入 /quit 退出")
+        print("\n[就绪] 桌面伴侣已启动！")
+        print("[提示] 对着麦克风说话，或在终端输入文字按回车")
+        print("[提示] 输入 /quit 退出")
 
         # 启动后台处理线程
         bg_thread = threading.Thread(target=self._background_loop, daemon=True)
@@ -257,7 +257,11 @@ class DesktopCompanionApp:
 
 def main():
     """程序入口"""
+    from PyQt6.QtCore import Qt
     from PyQt6.QtWidgets import QApplication
+
+    # 必须在 QApplication 创建前设置（修复 QtWebEngine 导入顺序问题）
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
 
     app = QApplication(sys.argv)
     app.setApplicationName("桌面伴侣")
